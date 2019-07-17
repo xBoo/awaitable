@@ -9,9 +9,10 @@ namespace AwaitableTest {
             Console.WriteLine ($"Begin main,thread id is {Thread.CurrentThread.ManagedThreadId}");
             int result = await new CustomAwaitable ();
             Console.WriteLine ($"End main，result is {result},thread id is {Thread.CurrentThread.ManagedThreadId}");
+
+            Console.WriteLine("********************************");
+            await new CustomeTask();
             await Task.Delay (Timeout.Infinite);
         }
     }
-
-    
 }

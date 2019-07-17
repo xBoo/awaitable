@@ -66,7 +66,7 @@
         }
     }
 ```
-上述代码中，CustomAwaitable满足了可被await的所有条件，并且正常通过编译，运行后发现结果如下：
+上述代码中，CustomAwaitable 实例满足了可被await的所有条件，并且正常通过编译，运行后发现结果如下：
 
 ```
 PS D:\git\awaitable\src> dotnet run
@@ -81,56 +81,18 @@ End Invoke
 >根据上述日志，可以看出：
 >1. **执行前后线程并未发生切换，所以当我们不假思索的回答 await/async 就是异步编程时，至少是一个不太严谨的答案**
 >
->2. 最后执行日志 "End Invoke" 表明：continuation action 这个委托，根据上述调用日志顺序可以大致理解为：编译器将await之后的代码封装为这个 action，在实例完成后调用OnCompleted方法执行了await 之后的代码（注：实际情况比较复杂，如果有多行await，会转换为一个状态机，具体参看文章开头给出的连接）。
+>2. **最后执行日志 "End Invoke" 表明：continuation action 这个委托，根据上述调用日志顺序可以大致理解为：编译器将await之后的代码封装为这个 action，在实例完成后调用OnCompleted方法执行了await 之后的代码（注：实际情况比较复杂，如果有多行await，会转换为一个状态机，具体参看文章开头给出的连接）。**
 
 
-了解了上述知识之后，那么我们常规所说的await异步编程又是怎么回事呢？先来看Task部分源码：
-https://referencesource.microsoft.com/#mscorlib/system/threading/Tasks/Task.cs,045a746eb48cbaa9
+了解了上述知识之后，那么我们常规所说的await异步编程又是怎么回事呢？
+1. 先来看Task部分源码([传送门](https://referencesource.microsoft.com/#mscorlib/system/threading/Tasks/Task.cs,9865ec4fb8abca74))：
 
-``` csharp
-  public struct TaskAwaiter : ICriticalNotifyCompletion
-    {
-        private readonly Task m_task;
-        internal TaskAwaiter(Task task)
-        {
-            Contract.Requires(task != null, "Constructing an awaiter requires a task to await.");
-            m_task = task;
-        }
+![Task](./images/task.png)
 
-        public void GetResult()
-        {
-            ValidateEnd(m_task);
-        }
+上述红框代码显示，Task在GetAwaiter中创建了 TaskAwaiter对象，并将this传递。
 
-        ....
-    }
-        
-```
+2. 再来看TaskAwaiter源码([传送门](https://referencesource.microsoft.com/#mscorlib/system/runtime/compilerservices/TaskAwaiter.cs,16e40fc537484d93))：
+![TaskAwatier1](./images/taskawaiter1.png)
+![TaskAwatier2](./images/taskawaiter2.png)
 
-首先TaskAwaiter 必须接收一个Task参数，并且当调用 GetResult() 时，会等待Task完成并返回结果：
-
-``` csharp
-        internal static void ValidateEnd(Task task)
-        {
-            if (task.IsWaitNotificationEnabledOrNotRanToCompletion)
-            {
-                HandleNonSuccessAndDebuggerNotification(task);
-            }
-        }
-
-        private static void HandleNonSuccessAndDebuggerNotification(Task task)
-        {
-            if (!task.IsCompleted)
-            {
-                bool taskCompleted = task.InternalWait(Timeout.Infinite, default(CancellationToken));
-                Contract.Assert(taskCompleted, "With an infinite timeout, the task should have always completed.");
-            }
- 
-            task.NotifyDebuggerOfWaitCompletionIfNecessary();
- 
-            // And throw an exception if the task is faulted or canceled.
-            if (!task.IsRanToCompletion) ThrowForNonSuccess(task);
-        }
-```
-上述if条件中，如果Task状态为未完成，则会一直等待该任务完成后进行回调后续操作。
-
+看到此处，是不是很熟悉，Task通过增加一个GetAwatier()函数，同时将自身传递给TaskAwaiter类来实现了await语法糖的支持，同时在执行时，调用GetResult()函数的本质是通过 Task.Wait等待异步线程的执行完成，然后通过回调进行后续的操作。

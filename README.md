@@ -84,8 +84,6 @@ End Invoke
 >1. **执行前后线程并未发生切换，所以当我们不假思索的回答 await/async 就是异步编程时，至少是一个不太严谨的答案**
 >2. **最后执行日志 "End Invoke" 表明：continuation action 这个委托，根据上述调用日志顺序可以大致理解为：编译器将await之后的代码封装为这个 action，在实例完成后调用OnCompleted方法执行了await 之后的代码（注：实际情况比较复杂，如果有多行await，会转换为一个状态机，具体参看文章开头给出的连接）。**
 
-
-
 #### 2.了解了上述知识之后，那么我们常规所说的await Task异步编程又是怎么回事呢？
 
 1.  先来看Task部分源码([传送门](https://referencesource.microsoft.com/#mscorlib/system/threading/Tasks/Task.cs,9865ec4fb8abca74))：
@@ -100,5 +98,7 @@ End Invoke
 
 看到此处，有了前面的知识，我们会对await task有了更加深入的理解：**Task通过增加一个GetAwatier()函数，同时将自身传递给TaskAwaiter类来实现了await语法糖的支持，同时在执行时，调用GetResult()函数的本质是通过 Task.Wait等待异步线程的执行完成，然后通过回调进行后续的操作。**
 
+#### 总结
+本文主要对 async/await 语法糖进行分析验证，同时通过对Task源码分析，更加深入的理解此语法糖本身的语法，相信通过通过此文，对大家从多个角度去理解异步编程有帮助，我自己也在不停的学习。
 
-
+本文代码示例地址：https://github.com/xBoo/awaitable
